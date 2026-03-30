@@ -45,15 +45,18 @@ app.get("/api/lagu_spotify", async (req, res) => {
   try {
     const token = await getToken();
 
+
     const response = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
       headers: {
         "Authorization": `Bearer ${token}`
       }
     })
 
+    console.log("STATUS:", response.status, response);
+
     if(response.status == 204 || response.status > 400) {
       return res.status(200).json({
-        message: 'Putro tidak lagi memutar spotifynya 🗣️',
+        message: 'Putro sedang tidak memutar spotifynya 🗣️',
         status: 200
       })
     }
@@ -81,6 +84,7 @@ app.get("/api/lagu_spotify", async (req, res) => {
 });
 
 app.get("/api/fav_song", async (req, res) => {
+  const FAVORITE_TRACK_ID = "1ai6CZYghbvcxEGeedqXoM";
   try {
     const token = await getToken();
 
@@ -92,6 +96,34 @@ app.get("/api/fav_song", async (req, res) => {
         },
       }
     );
+
+    if (response.status === 403 || !response.ok) {
+      console.log("Top tracks gagal, kudu premium yaelah fallback ke yg hardcode");
+
+      const fallbackResponse = await fetch(
+        `https://api.spotify.com/v1/tracks/${FAVORITE_TRACK_ID}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      console.log("Fallback status:", fallbackResponse.status);
+      console.log("Fallback Track ID:", FAVORITE_TRACK_ID);
+      const fallbackText = await fallbackResponse.text(); // baca raw dulu
+      console.log("Fallback response:", fallbackText);
+
+      if (!fallbackResponse.ok) {
+        return res.status(500).json({ message: "Gagal fetch data dari Spotify", status: 500 });
+      }
+
+      const fallbackData = await fallbackResponse.json();
+      return res.status(200).json({
+        artist: fallbackData.artists.map((a) => a.name).join(", "),
+        judul: fallbackData.name,
+        imgLagu: fallbackData.album.images[0]?.url,
+        message: "Butuh Spotify Premium buat top tracknya jadi dapetnya yg hardcode aja",
+        status: 200
+      });
+    }
 
     if (!response.ok) {
       console.log(await response.text()); // debug
