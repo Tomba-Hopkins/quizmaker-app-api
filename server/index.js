@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import Quiz from "./models/quizModel.js";
 import expressRateLimit from "express-rate-limit";
 import getToken from "./function/getToken.js";
+import { SYSTEM_PROMPT } from "./function/systemPrompt.js";
 
 config();
 mongoose
@@ -21,7 +22,7 @@ app.set("trust proxy", 1);
 // middleware
 const rateLimiter = expressRateLimit({
   windowMs: 10 * 60 * 1000,
-  max: 30,
+  max: 15,
   message: "Too many req",
   standardHeaders: true,
   legacyHeaders: false,
@@ -178,6 +179,43 @@ app.post("/api/create-quiz", async (req, res) => {
     status: 201,
   });
 });
+
+app.post("/api/chat", rateLimiter, async (req, res) => {
+  const { messages } = req.body;
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: SYSTEM_PROMPT }]
+          },
+          contents: messages.map(msg => ({
+            role: msg.role === "assistant" ? "model" : "user",
+            parts: [{ text: msg.content }]
+          })),
+          generationConfig: {
+            maxOutputTokens: 300,
+            temperature: 0.7,
+          }
+        })
+      }
+    )
+
+    const data = await response.json()
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "Something went wrong."
+    res.status(200).json({ reply })
+
+  } catch (err) {
+    console.log("Error", err)
+    res.status(500).json({ message: "Error server lah", status: 500 })
+  }
+})
+
+
 
 const port = process.env.PORT || 5000;
 
