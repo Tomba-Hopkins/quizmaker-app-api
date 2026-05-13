@@ -21,9 +21,9 @@ app.set("trust proxy", 1);
 
 // middleware
 const rateLimiter = expressRateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 15,
-  message: "Too many req",
+  windowMs: 1 * 60 * 1000,
+  max: 5,
+  message: "Bentar sidi lagi mikir",
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -183,9 +183,11 @@ app.post("/api/create-quiz", async (req, res) => {
 app.post("/api/chat", rateLimiter, async (req, res) => {
   const { messages } = req.body;
 
+  const limitedMessages = messages.slice(-6);
+
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -193,19 +195,29 @@ app.post("/api/chat", rateLimiter, async (req, res) => {
           system_instruction: {
             parts: [{ text: SYSTEM_PROMPT }]
           },
-          contents: messages.map(msg => ({
+          contents: limitedMessages.map(msg => ({
             role: msg.role === "assistant" ? "model" : "user",
             parts: [{ text: msg.content }]
           })),
           generationConfig: {
-            maxOutputTokens: 300,
-            temperature: 0.7,
+            maxOutputTokens: 600,  // jawab mendalam ga panjang
+            temperature: 0.5,      // turun biar ga halu non challant
+            topP: 0.8,             // kata tajam berbobot
+            topK: 40,              // biar ga cerewet
           }
         })
       }
     )
 
     const data = await response.json()
+    // console.log("respon:", JSON.stringify(data)) 
+    
+    if (data.error) {
+      return res.status(data.error.code || 429).json({ 
+        reply: "abis quota gw cuk" 
+      });
+    }
+
     const reply = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "Something went wrong."
     res.status(200).json({ reply })
 
@@ -214,6 +226,7 @@ app.post("/api/chat", rateLimiter, async (req, res) => {
     res.status(500).json({ message: "Error server lah", status: 500 })
   }
 })
+
 
 
 
