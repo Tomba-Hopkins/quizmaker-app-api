@@ -200,8 +200,8 @@ app.post("/api/chat", rateLimiter, async (req, res) => {
             parts: [{ text: msg.content }]
           })),
           generationConfig: {
-            maxOutputTokens: 600,  // jawab mendalam ga panjang
-            temperature: 0.5,      // turun biar ga halu non challant
+            maxOutputTokens: 1000,  // jawab mendalam ga panjang
+            temperature: 0.6,      // turun biar ga halu non challant
             topP: 0.8,             // kata tajam berbobot
             topK: 40,              // biar ga cerewet
           }
@@ -210,7 +210,8 @@ app.post("/api/chat", rateLimiter, async (req, res) => {
     )
 
     const data = await response.json()
-    // console.log("respon:", JSON.stringify(data)) 
+    console.log("respon:", JSON.stringify(data)) 
+    console.log("Finish Reason:", data.candidates?.[0]?.finishReason);
     
     if (data.error) {
       return res.status(data.error.code || 429).json({ 
